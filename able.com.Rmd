@@ -1,0 +1,236 @@
+---
+title: "able.com"
+author: "Anais Corral"
+date: "2024-08-24"
+output:
+  html_document:
+    toc: true
+    toc_depth: 3 
+  pdf_document: default
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Load data & preparation
+
+```{r}
+# Importing observed toy sales data
+
+toy_sales <- read.csv("https://raw.githubusercontent.com/jefftwebb/data/main/toy_sales_data.csv")
+
+# Importing toy sales data with potential outcomes 
+toy_sales_PO <- read.csv(url("https://raw.githubusercontent.com/jefftwebb/data/main/toy_sales_PO.csv"))
+
+head(toy_sales)
+head(toy_sales_PO)
+```
+
+# Question 1
+
+```{r}
+# Calculate the true ATE
+ATE <- mean(toy_sales_PO$y1 - toy_sales_PO$y0)
+ATE
+```
+
+45.9 means that, on average, stores sold about 46 more units when they
+had a sale compared to when they didn't.
+
+# Question 2
+
+```{r}
+# Calculate the average sales for weeks with a sale
+avg_sales_with_sale <- mean(toy_sales$weekly_amount_sold[toy_sales$is_on_sale == 1])
+
+# Calculate the average sales for weeks without a sale
+avg_sales_without_sale <- mean(toy_sales$weekly_amount_sold[toy_sales$is_on_sale == 0])
+
+# Calculate the estimated ATE
+estimated_ATE <- avg_sales_with_sale - avg_sales_without_sale
+estimated_ATE
+
+```
+
+The observed data suggests that stores sell about 78 more units during a
+sale, but the true impact is actually closer to 46 units. This means the
+observed data might be overestimating the effect of having a sale.
+
+# Question 3
+
+The bias in using observed data to estimate the ATE comes from other
+factors that might influence sales during sale weeks. These factors
+could cause the observed effect to seem larger than the true impact of
+the sale, leading to an overestimation of the sale's actual effect.
+
+# Question 4
+
+```{r}
+# Creating a balance table
+
+# Calculate mean and standard deviation of avg_week_sales for treatment and control groups
+mean_with_sale <- mean(toy_sales$avg_week_sales[toy_sales$is_on_sale == 1])
+sd_with_sale <- sd(toy_sales$avg_week_sales[toy_sales$is_on_sale == 1])
+
+mean_without_sale <- mean(toy_sales$avg_week_sales[toy_sales$is_on_sale == 0])
+sd_without_sale <- sd(toy_sales$avg_week_sales[toy_sales$is_on_sale == 0])
+
+# Create a balance table
+balance_table <- data.frame(
+  Group = c("With Sale", "Without Sale"),
+  Mean_avg_week_sales = c(mean_with_sale, mean_without_sale),
+  SD_avg_week_sales = c(sd_with_sale, sd_without_sale)
+)
+
+balance_table
+
+```
+
+The balance table shows that stores with sales have higher average
+weekly sales and more variability compared to those without sales. This
+indicates that the two groups aren't fully comparable, suggesting
+potential bias in estimating the effect of having a sale.
+
+The groups aren't fully exchangeable because stores with sales generally
+sell more each week than those without sales. This difference suggests
+that the stores running sales might be bigger or more successful, making
+it hard to compare the two groups fairly. As a result, it's difficult to
+say that any increase in sales is only due to the sale itself, because
+other factors might be at play.
+
+# Question 5
+
+```{r}
+# Fit a linear regression model adjusting for avg_week_sales
+model <- lm(weekly_amount_sold ~ is_on_sale + avg_week_sales, data = toy_sales)
+
+# Summary of the model
+summary(model)
+
+# Extract the coefficient for is_on_sale, which represents the adjusted ATE
+adjusted_ATE <- coef(model)["is_on_sale"]
+adjusted_ATE
+
+```
+
+## Report an adjusted ATE
+
+The adjusted ATE is 69 units, which is closer to the true ATE of 46
+units, but still slightly higher.
+
+## How does it compare to the true ATE?
+
+The adjustment accounts for company size, helping to reduce bias by
+considering that larger stores typically sell more, making the ATE
+estimate more accurate.
+
+The adjusted ATE of 69 units, while closer to the true ATE of 46 units,
+suggests that accounting for company size reduces the overestimation
+seen in the unadjusted analysis. This adjustment is important because it
+controls for the fact that larger stores, which tend to sell more
+products, are more likely to run sales. By considering company size, the
+model provides a more realistic estimate of the sale's impact, although
+it still slightly overestimates the true effect, indicating that there
+may be other factors at play that were not accounted for in the model.
+
+# Question 6
+
+```{r}
+# Load the toy_sales_PO.csv data (assuming already loaded as toy_sales_PO)
+
+# Calculate CATE for each level of weeks_to_xmas
+cate_3 <- mean(toy_sales_PO$y1[toy_sales_PO$weeks_to_xmas == 3] - toy_sales_PO$y0[toy_sales_PO$weeks_to_xmas == 3])
+cate_2 <- mean(toy_sales_PO$y1[toy_sales_PO$weeks_to_xmas == 2] - toy_sales_PO$y0[toy_sales_PO$weeks_to_xmas == 2])
+cate_1 <- mean(toy_sales_PO$y1[toy_sales_PO$weeks_to_xmas == 1] - toy_sales_PO$y0[toy_sales_PO$weeks_to_xmas == 1])
+cate_0 <- mean(toy_sales_PO$y1[toy_sales_PO$weeks_to_xmas == 0] - toy_sales_PO$y0[toy_sales_PO$weeks_to_xmas == 0])
+
+# Print the results
+cate_3
+cate_2
+cate_1
+cate_0
+
+```
+
+CATE for Weeks to Christmas = 3: 49.78 units CATE for Weeks to Christmas
+= 2: 48.94 units CATE for Weeks to Christmas = 1: 46.14 units CATE for
+Weeks to Christmas = 0: 38.75 units
+
+The impact of running a sale gets smaller as Christmas gets closer.
+Sales have a bigger effect 3 weeks before Christmas than they do in the
+final week, suggesting that shoppers may be more influenced by sales
+earlier in the month.
+
+# Question 7
+
+```{r}
+# Fit the linear regression model with an interaction term between is_on_sale and weeks_to_xmas
+model_interaction <- lm(weekly_amount_sold ~ is_on_sale * weeks_to_xmas + avg_week_sales, data = toy_sales)
+
+# Summary of the model (if you want to check the coefficients)
+summary(model_interaction)
+
+# Coefficients from the model
+coefficients <- coef(model_interaction)
+
+# Calculate adjusted CATE for each level of weeks_to_xmas
+cate_adjusted_3 <- coefficients["is_on_sale"] + coefficients["is_on_sale:weeks_to_xmas"] * 3
+cate_adjusted_2 <- coefficients["is_on_sale"] + coefficients["is_on_sale:weeks_to_xmas"] * 2
+cate_adjusted_1 <- coefficients["is_on_sale"] + coefficients["is_on_sale:weeks_to_xmas"] * 1
+cate_adjusted_0 <- coefficients["is_on_sale"]
+
+# Create a data frame for comparison
+comparison <- data.frame(
+  Weeks_to_Xmas = c(3, 2, 1, 0),
+  True_CATE = c(49.78, 48.94, 46.14, 38.75),
+  Adjusted_CATE = c(cate_adjusted_3, cate_adjusted_2, cate_adjusted_1, cate_adjusted_0)
+)
+
+# Print the comparison table to check the values
+print(comparison)
+```
+
+```{r}
+# Plotting the comparison between True CATE and Adjusted CATE
+library(ggplot2)
+
+ggplot(comparison, aes(x = factor(Weeks_to_Xmas))) +
+  geom_bar(aes(y = True_CATE, fill = "True CATE"), stat = "identity", position = "dodge", width = 0.4) +
+  geom_bar(aes(y = Adjusted_CATE, fill = "Adjusted CATE"), stat = "identity", position = "dodge", width = 0.4) +
+  labs(x = "Weeks to Christmas", y = "CATE (Units Sold)", title = "Comparison of True CATE vs. Adjusted CATE") +
+  scale_fill_manual(values = c("True CATE" = "blue", "Adjusted CATE" = "red")) +
+  theme_minimal()
+```
+
+## CATE for Weeks to Christmas = 3: - True CATE: 49.78 units - Adjusted
+
+CATE: 65.27 units - Comment: The adjusted CATE is higher than the true
+CATE by about 15.49 units.
+
+## CATE for Weeks to Christmas = 2: - True CATE: 48.94 units - Adjusted
+
+CATE: 55.78 units - Comment: The adjusted CATE is higher than the true
+CATE by about 6.84 units.
+
+## CATE for Weeks to Christmas = 1: - True CATE: 46.14 units - Adjusted
+
+CATE: 46.29 units - Comment: The adjusted CATE is very close to the true
+CATE, differing by only 0.15 units.
+
+## CATE for Weeks to Christmas = 0: - True CATE: 38.75 units - Adjusted
+
+CATE: 37.80 units - Comment: The adjusted CATE is slightly lower than
+the true CATE by about 0.95 units.
+
+The adjusted CATEs are generally higher than the true CATEs for weeks 2
+and 3, indicating that the model may overestimate the effect of the sale
+as Christmas approaches. However, for weeks 1 and 0, the adjusted CATEs
+are very close to the true CATEs, suggesting that the model captures the
+impact of the sale more accurately as the event draws nearer. Overall,
+the model seems to reflect the increasing urgency of shoppers but might
+slightly overstate the effect of sales in the weeks further out from
+Christmas.
